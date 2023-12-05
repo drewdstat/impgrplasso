@@ -81,13 +81,15 @@
 #' frames containing coefficients for each variable for specific imputed 
 #' datasets and lambda values. If \code{lams} is a single value, this is a 
 #' single data frame with variable- and imputation-specific coefficients.}
-#' \item{MeanCoef}{If \code{lams} is a vector, this is a data frame of mean 
-#' coefficients across imputed datasets for each variable at each fold and 
-#' lambda value. If \code{lams} is a single value, this is a data frame with 
-#' mean coefficients across imputed datasets for each variable.}
-#' \item{Loss}{This appears only if \code{lams} is a vector, and it is a data
-#' frame showing fold- and imputation-specific loss values and means for each 
-#' value of lambda.}
+#' \item{MeanCoef}{If \code{lams} is a vector of length > 1, this is a data 
+#' frame of mean coefficients across imputed datasets for each variable at 
+#' each fold and lambda value. If \code{lams} is a single value, this is a data 
+#' frame with mean coefficients across imputed datasets for each variable.}
+#' \item{Loss}{This appears only if \code{lams} is a vector of length > 1, and 
+#' it is a data frame showing fold- and imputation-specific loss values and 
+#' means for each value of lambda.}
+#' \item{MeanLoss}{This appears only if \code{lams} is a vector of length > 1, 
+#' and it is a data frame showing the mean prediction loss for each lambda value.}
 #' \item{Model}{This appears only if \code{lams} is a single value, and it is
 #' the \code{grplasso} model object run on the full dataset.}
 #' \item{Index}{This is the \code{index} argument for the \code{grplasso} 
@@ -102,12 +104,15 @@
 #' 
 #' @examples 
 #' nhanes$hyp <- as.factor(nhanes$hyp - 1)
+#' # above brings "hyp" from a {1, 2} set of unique values to {0, 1}
 #' imp <- mice(nhanes)
 #' dlist <- lapply(1:imp$m, function(x) complete(imp, x))
 #' 
 #' singlerun_milasso <- impgrplasso(dlist, 5, "hyp", c("age", "bmi", "chl"),
 #' "age")
 #' # This forces "age" into the model by not penalizing that variable.
+#' 
+#' summary(singlerun_milasso)
 #' 
 #' @references 
 #' 
@@ -126,28 +131,43 @@
 impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
                         forcedin = NULL, kfolds = 10, kfoldseed = 10, 
                         scalecenter = TRUE, dummify = TRUE){
+  if(is.integer(outname)|is.numeric(outname)){
+    outname <- names(impdatlist[[1]])[outname]
+  }
+  if(is.null(prednames)) prednames <- setdiff(names(impdatlist[[1]]), outname)
+  if(is.integer(prednames)|is.numeric(prednames)){
+    prednames <- names(longimpdat)[prednames]
+  }
+  
+  for(i in 1:length(impdatlist)) {impdatlist[[i]]<-
+    impdatlist[[i]][,c(outname,prednames)]}
+  
+  if(class(impdatlist[[1]][,outname])%in%c("factor","character")&
+     length(unique(impdatlist[[1]][,outname]))!=2){
+    stop("Error: 'outname' column must be binary or numeric.")}
+  
   if(dummify){
+    faccharcols<-names(impdatlist[[1]])[
+      sapply(impdatlist[[1]], 
+             function(x) class(x)=="character"|class(x)=="factor")]
     impdatlist <- lapply(impdatlist,
                          function(x) fastDummies::dummy_cols(
-                           x, select_columns = names(impdatlist[[1]]),
+                           x, select_columns = faccharcols,
                            ignore_na = T, remove_selected_columns = T,
                            remove_first_dummy = T))
   }
   
   longimpdat<-do.call("rbind", impdatlist)
   Impvec <- rep(1:length(impdatlist), each = nrow(impdatlist[[1]]))
+  outcol<-names(longimpdat)[grep(outname, names(longimpdat))]
+  if(length(outcol) > 1) 
+    stop("Error: 'outname' must indicate one unique column that is either binary or numeric")
+  
   names(longimpdat) <- gsub("<|>|\\.|,|\\$|\\'| |-|\\(|\\)","",
                             names(longimpdat))
-  if(is.null(prednames)) prednames <- setdiff(names(longimpdat), outname)
-  if(is.integer(prednames)|is.numeric(prednames)){
-    prednames <- names(longimpdat)[prednames]
-  }
-  if(is.integer(outname)|is.numeric(outname)){
-    outname <- names(longimpdat)[outname]
-  }
   
-  longimpdat <- longimpdat[,c(prednames, outname)]
-  diagimpdat <- longimpdat[, prednames]
+  yvec <- longimpdat[, outcol]
+  diagimpdat <- longimpdat[, -which(names(longimpdat)==outcol)]
   diagimpdat[which(Impvec!=1),] <- 0
   colnames(diagimpdat) <- paste0(colnames(diagimpdat), "|1")
   for(i in 2:length(impdatlist)){
@@ -156,8 +176,6 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
     colnames(adduct) <- paste0(colnames(adduct), "|", i)
     diagimpdat <- cbind(diagimpdat, adduct)
   }
-  
-  yvec <- longimpdat[, outname]
   
   if(!is.null(kfolds)){
     fold <- cut(seq(1, nrow(impdatlist[[1]])), breaks = kfolds, labels = FALSE)
@@ -196,23 +214,23 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
     impbeta0mat[which(impbeta0mat[, 1] == i), i + 1] <- 1
   }
   impbeta0mat <- impbeta0mat[, -1]
-  colnames(impbeta0mat) <- paste0("beta0", 1:ncol(impbeta0mat))
+  colnames(impbeta0mat) <- paste0("beta0|", 1:ncol(impbeta0mat))
   
-  if(!is.null(kfolds)){
+  if(length(lams) > 1){
     for(ff in 1:kfolds){
       print(paste0("Fold ",ff))
       longimpdatfold <- longimpdat[which(folds != ff),]
       if(scalecenter){
-        longstd <- scale(longimpdatfold[, prednames])
+        longstd <- scale(longimpdatfold[, -which(names(longimpdatfold)==outcol)])
         longstdterms <- list(Centers = attr(longstd, "scaled:center"),
                              Scales = attr(longstd, "scaled:scale"))
         diagimpdat.std <- longstd
       } else {
-        diagimpdat.std <- longimpdatfold[, prednames]
+        diagimpdat.std <- longimpdatfold[, -which(names(longimpdatfold)==outcol)]
       }
       
       foldimpvec <- Impvec[which(folds != ff)]
-      diagimpdat.std[which(foldimpvec != 0),] <- 0
+      diagimpdat.std[which(foldimpvec != 1),] <- 0
       colnames(diagimpdat.std) <- paste0(colnames(diagimpdat.std), "|1")
       for(i in 2:length(impdatlist)){
         adduct <- as.matrix(longstd)
@@ -250,9 +268,9 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
         #Rescale coef
         if(scalecenter){
           for(i in 2:ncol(tempmil$coefficients)){
-            tempmil$coefficients[i, -1] <- tempmil$coefficients[i, -1]/
-              longstdterms$Scales[i - 1]
-            tempmil$coefficients[1, i] <- mean(tempyorig) - 
+            tempmil$coefficients[-1, i] <- tempmil$coefficients[-1, i]/
+              longstdterms$Scales
+            tempmil$coefficients[1, i] <- mean(tmpyorig) - 
               tempmil$coefficients[-1, i] %*% longstdterms$Centers
           }
         }
@@ -269,8 +287,8 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
           valdat <- impdatlist[[d]]
           names(valdat) <- gsub("<|>|\\.|,|\\$|\\'| |-|\\(|\\)","",
                                 names(valdat))
-          xd <- as.matrix(valdat[which(fold == ff), prednames])
-          yd <- valdat[which(fold == ff), outname]
+          xd <- as.matrix(valdat[which(fold == ff), -which(names(valdat)==outcol)])
+          yd <- valdat[which(fold == ff), outcol]
           b0d <- tempmil$coefficients[1, paste0("Imp", d)]
           bd <- tempmil$coefficients[2:nrow(tempmil$coefficients),
                                      paste0("Imp", d)]
@@ -288,7 +306,7 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
       }
     }
     allloss <- do.call("rbind", losslist)
-    names(allloss) <- c("Lambda", paste0("Imp", 1:10))
+    names(allloss) <- c("Lambda", paste0("Imp", 1:length(impdatlist)))
     allloss$MeanLoss <- rowMeans(allloss[, -1])
     allloss$Fold <- rep(1:kfolds, each = length(lams))
     allloss <- allloss[, c(ncol(allloss), 1:(ncol(allloss) - 1))]
@@ -297,10 +315,12 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
                                 levels = unique(allmilcoef[[1]]$Variable))
     MeanCoef$Mean <- rowMeans(MeanCoef[,2:(length(impdatlist) + 1)])
     MeanCoef <- aggregate(Mean ~ Variable + Fold + Lambda, MeanCoef, mean)
+    
+    meanloss<-aggregate(MeanLoss ~ Lambda, allloss, mean)
     retlist <- list(Coef = allmilcoef, MeanCoef = MeanCoef, Loss = allloss, 
-                    Index = grpl_index)
+                    MeanLoss = meanloss, Index = grpl_index)
   } else {
-    if(length(lams) != 1) stop("If kfolds is NULL, there can only be one lambda")
+    # if(length(lams) != 1) stop("If kfolds is NULL, there can only be one lambda")
     if(scalecenter){
       longstd <- scale(longimpdat[, prednames])
       longstdterms <- list(Centers = attr(longstd, "scaled:center"),
@@ -310,11 +330,11 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
       diagimpdat.std <- longimpdat[, prednames]
     }
     diagimpdat.std[which(Impvec != 1),] <- 0
-    colnames(diagimpdat.std) <- paste0(colnames(diagimpdat.std, "|1"))
+    colnames(diagimpdat.std) <- paste0(colnames(diagimpdat.std), "|1")
     for(i in 2:length(impdatlist)){
       adduct <- as.matrix(longstd)
       adduct[which(Impvec != i),] <- 0
-      colnames(adduct) <- paste0(colnames(diagimpdat.std), "|", i)
+      colnames(adduct) <- paste0(colnames(adduct), "|", i)
       diagimpdat.std <- cbind(diagimpdat.std, adduct)
     }
     
@@ -334,14 +354,32 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
     #Rescale coefficients
     if(scalecenter){
       for(i in 2:ncol(tempmil$coefficients)){
-        tempmil$coefficients[i, -1] <- tempmil$coefficients[i, -1]/
-          longstdterms$Scales[i-1]
-        tempmil$coefficients[i, 1] <- mean(yvec) - 
+        tempmil$coefficients[-1, i] <- tempmil$coefficients[-1, i]/
+          longstdterms$Scales
+        tempmil$coefficients[1, i] <- mean(yvec) - 
           tempmil$coefficients[-1, i] %*% longstdterms$Centers
       }
     }
+    tempmil$coefficients$MeanCoef<-rowMeans(tempmil$coefficients[,-1])
+    MeanCoef<-tempmil$coefficients$MeanCoef
+    names(MeanCoef)<-tempmil$coefficients$Variable
     retlist <- list(Coef = tempmil$coefficients, MeanCoef = MeanCoef, 
                     Model = tempmil, Index = grpl_index, allX = allX)
   }
+  class(retlist)<-"impgrplasso"
   return(retlist)
+}
+
+#' @rawNamespace S3method(summary, impgrplasso)
+
+summary.impgrplasso <- function(object, ...){
+  if(any(grepl("MeanLoss",names(object)))){
+    lossout<-object$MeanLoss$MeanLoss
+    names(lossout)<-object$MeanLoss$Lambda
+    message("Mean prediction loss by lambda: \n")
+    lossout
+  } else {
+    message("Mean LASSO regression coefficients: \n")
+    object$MeanCoef
+  }
 }
