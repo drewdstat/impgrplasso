@@ -63,7 +63,7 @@ can be set to FALSE if one wants to create dummy variables ahead of time and
 include them in the list of data frames \code{impdatlist}.}
 }
 \value{
-\code{impgrplasso} returns a list which contains:
+\code{impgrplasso} returns a list of class 'impgrplasso' which contains:
 
 \item{Coef}{If \code{lams} is a vector, this is a list of fold-specific data
 frames containing coefficients for each variable for specific imputed

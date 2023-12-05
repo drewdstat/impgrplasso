@@ -75,7 +75,7 @@
 #' can be set to FALSE if one wants to create dummy variables ahead of time and 
 #' include them in the list of data frames \code{impdatlist}.
 #' 
-#' @return \code{impgrplasso} returns a list which contains:
+#' @return \code{impgrplasso} returns a list of class 'impgrplasso' which contains:
 #' 
 #' \item{Coef}{If \code{lams} is a vector, this is a list of fold-specific data 
 #' frames containing coefficients for each variable for specific imputed 
@@ -320,7 +320,6 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
     retlist <- list(Coef = allmilcoef, MeanCoef = MeanCoef, Loss = allloss, 
                     MeanLoss = meanloss, Index = grpl_index)
   } else {
-    # if(length(lams) != 1) stop("If kfolds is NULL, there can only be one lambda")
     if(scalecenter){
       longstd <- scale(longimpdat[, prednames])
       longstdterms <- list(Centers = attr(longstd, "scaled:center"),
@@ -341,7 +340,7 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
     allX <- cbind(impbeta0mat, as.matrix(diagimpdat.std))
     
     tempmil <- grplasso(x = allX, y = yvec, index = grpl_index,
-                        lambda = lams[l], center = FALSE, standardize = FALSE)
+                        lambda = lams[1], center = FALSE, standardize = FALSE)
     coefdat <- as.data.frame(tempmil$coefficients)
     names(coefdat)[1] <- "Coef"
     coefdat$VarName <- gsub("\\|.*", "", rownames(tempmil$coefficients))
