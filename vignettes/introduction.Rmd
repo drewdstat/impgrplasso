@@ -142,7 +142,7 @@ nh <- nhanes
 nh$hyp <- as.factor(nh$hyp - 1)
 # above brings "hyp" from a {1, 2} set of unique values to {0, 1}
 
-imp <- mice(nhanes, printFlag = FALSE)
+imp <- mice(nh, printFlag = FALSE)
 dlist <- lapply(1:imp$m, function(x) complete(imp, x))
 ```
 
@@ -182,7 +182,8 @@ library(impgrplasso)
 nh$Group <- as.factor(c(rep(LETTERS[1:2], times = c(6, 7)), 
                         rep(LETTERS[1:2], times = c(6, 6))))
 
-dlist2 <-  mice_by_group(nh, "Group", list(m = 5, maxit = 5, seed = 2))
+dlist2 <-  mice_by_group(nh, "Group", list(m = 5, maxit = 5, seed = 2, 
+                                           printFlag = FALSE))
 ```
 
 ## impgrplasso
