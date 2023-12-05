@@ -249,9 +249,9 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
       tmpyorig <- yvec[-which(folds == ff)]
       
       for(l in 1:length(lams)){
-        tempmil <- grplasso(x = allX, y = tmpyorig,
+        tempmil <- suppressWarnings(grplasso(x = allX, y = tmpyorig,
                             index = grpl_index, lambda = lams[l],
-                            center = FALSE, standardize = FALSE)
+                            center = FALSE, standardize = FALSE))
         coefdat <- as.data.frame(tempmil$coefficients)
         names(coefdat)[1] <- "Coef"
         coefdat$VarName <- gsub("\\|.*", "", rownames(tempmil$coefficients))
@@ -339,8 +339,8 @@ impgrplasso <- function(impdatlist, lams, outname, prednames = NULL,
     
     allX <- cbind(impbeta0mat, as.matrix(diagimpdat.std))
     
-    tempmil <- grplasso(x = allX, y = yvec, index = grpl_index,
-                        lambda = lams[1], center = FALSE, standardize = FALSE)
+    tempmil <- suppressWarnings(grplasso(x = allX, y = yvec, index = grpl_index,
+                        lambda = lams[1], center = FALSE, standardize = FALSE))
     coefdat <- as.data.frame(tempmil$coefficients)
     names(coefdat)[1] <- "Coef"
     coefdat$VarName <- gsub("\\|.*", "", rownames(tempmil$coefficients))
