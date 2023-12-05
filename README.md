@@ -46,5 +46,5 @@ devtools::install_github("drewdstat/impgrplasso")
 ## Usage
 
 Here is a [brief tutorial
-vignette](http://htmlpreview.github.io/?https://github.com/drewdstat/impgrplasso/blob/working/vignettes/introduction.html)
+vignette](http://htmlpreview.github.io/?https://github.com/drewdstat/impgrplasso/blob/main/vignettes/introduction.html)
 on how to use the impgrplasso package.
