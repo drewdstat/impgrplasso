@@ -4,12 +4,12 @@ author: "Drew Day"
 date: "12/03/2023"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntryHow to use the wqspt package}
-  %\VignetteEngineknitr::rmarkdown}
-  %\VignetteEncodingUTF-8}
+  %\VignetteIndexEntry{How to use the impgrplasso package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
-```r, include = FALSE}
+```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
@@ -72,7 +72,7 @@ incorporating the following additional features:
 Standard LASSO regression minimizes the loss function below:
 
 $$
-\sum_i=1}^N}(y_i-[\beta_0+\sum_j=1}^p}\beta_j x_ij}]})^2} + \lambda \sum_j=1}^p}\left\lvert\beta_j}\right\lvert}
+\sum_{i=1}^{N}{(y_i-[\beta_0+\sum_{j=1}^{p}{\beta_j x_{ij}]})^2} + \lambda \sum_{j=1}^{p}{\left\lvert{\beta_j}\right\lvert}
 $$
 
 Notice how the formula to the left of the addition sign is just the function that 
@@ -87,7 +87,7 @@ The Chen and Wang 2013 MI-LASSO approach to LASSO regression for multiply impute
 data minimizes the similar function below:
 
 $$
-\sum_d=1}^m}\sum_i=1}^N}(y_di}-[\beta_0d}+\sum_j=1}^p}\beta_dj} x_dij}}])^2}} + \lambda \sum_j=1}^p}\sqrt\sum_d=1}^m}\beta^2_dj}}}
+\sum_{d=1}^{m}{\sum_{i=1}^{N}{(y_{di}-[\beta_{0d}+\sum_{j=1}^{p}{\beta_{dj} x_{dij}}])^2}} + \lambda \sum_{j=1}^{p}\sqrt{\sum_{d=1}^{m}{\beta^2_{dj}}}
 $$
 
 Here the loss function is being summed over $m$ imputed data sets. In practice, we
@@ -102,7 +102,7 @@ be generated (the referent level is omitted). Using the vertical bar to denote
 the imputed version of each variable and the underscore to denote levels of a
 categorical variable, I will get the following model matrix:
 
-```r echo=F}
+```{r echo=F}
 dat<-data.frame(ID=rep(paste0("ID",1:3),2),beta0.1=rep(c(1,0),each=3),
                 X1.1=c(6.5,0.2,3.3,rep(0,3)),
                 X2_Level1.1=c(1,0,1,rep(0,3)),X2_Level2.1=c(1,0,1,rep(0,3)),
@@ -137,12 +137,12 @@ In this example, we will use MICE and create a list of imputed data frames using
 the `nhanes` example data frame included in the 'mice' package.
 
 ```{r}
-library(mice)
+suppressPackageStartupMessages(library(mice))
 nh <- nhanes
 nh$hyp <- as.factor(nh$hyp - 1)
 # above brings "hyp" from a {1, 2} set of unique values to {0, 1}
 
-imp <- mice(nh, printFlag = FALSE)
+imp <- mice(nhanes, printFlag = FALSE)
 dlist <- lapply(1:imp$m, function(x) complete(imp, x))
 ```
 
@@ -178,8 +178,11 @@ The output of `mice_by_group` is a list of imputed data frames.
 ```{r}
 library(mice)
 library(impgrplasso)
-nh$Group <- as.factor(rep(LETTERS[1:2], times = c(12, 13)))
-dlist2 <-  mice_by_group(nh, "Group", list(m=5, maxit=5, seed=2))
+
+nh$Group <- as.factor(c(rep(LETTERS[1:2], times = c(6, 7)), 
+                        rep(LETTERS[1:2], times = c(6, 6))))
+
+dlist2 <-  mice_by_group(nh, "Group", list(m = 5, maxit = 5, seed = 2))
 ```
 
 ## impgrplasso
@@ -263,7 +266,8 @@ outname = "hyp", prednames = c("age", "bmi", "chl"), forcedin = "age",
 kfolds = 4, kfoldseed = 12)
 
 summary(multiple_milasso)
-
+```
+```{r}
 # Single Run
 
 singlerun_milasso <- impgrplasso(dlist, 3, "hyp", c("age", "bmi", "chl"), "age")

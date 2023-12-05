@@ -42,8 +42,13 @@ mice_by_group <- function(Data, groupvar, miceArgs = list(
   
   getgroupmice <- function(str){
     tmpdat <- Data[which(Data[, groupvar] == str), -which(names(Data) == groupvar)]
-    tmpdat[, sapply(tmpdat,is.factor)] <- lapply(tmpdat[
-      , sapply(tmpdat, is.factor)], droplevels)
+    if(length(which(sapply(tmpdat,is.factor))) == 1){
+      tmpdat[, sapply(tmpdat,is.factor)] <- droplevels(tmpdat[
+        , sapply(tmpdat, is.factor)])
+    } else if(length(which(sapply(tmpdat,is.factor))) > 1){
+      tmpdat[, sapply(tmpdat,is.factor)] <- lapply(tmpdat[
+        , sapply(tmpdat, is.factor)], droplevels)
+    }
     do.call(mice, c(list(data=tmpdat), miceArgs))
   }
   
