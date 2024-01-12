@@ -22,7 +22,7 @@ al. 2023, this one best combined a low out-of-sample MSE and readily
 interpretable coefficients.
 
 This package includes functions that implement the MI-LASSO method with
-the additional additions of incorporating the validated group LASSO
+the additional features of incorporating the validated group LASSO
 method of the [‘grplasso’](https://CRAN.R-project.org/package=grplasso)
 package ([Meier et
 al. 2008](https://rss.onlinelibrary.wiley.com/doi/10.1111/j.1467-9868.2007.00627.x)),
